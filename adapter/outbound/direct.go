@@ -26,6 +26,25 @@ func (d *Direct) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn,
 		return nil, err
 	}
 	opts := d.DialOptions()
+	if d.prefer == C.DualStack {
+		srcIP := metadata.SrcIP.Unmap()
+		if srcIP.IsValid() && !srcIP.IsUnspecified() {
+			if srcIP.Is6() {
+				opts = append(opts, dialer.WithPreferIPv6())
+			} else if srcIP.Is4() {
+				opts = append(opts, dialer.WithPreferIPv4())
+			}
+		} else {
+			inIP := metadata.InIP.Unmap()
+			if inIP.IsValid() && !inIP.IsUnspecified() {
+				if inIP.Is6() {
+					opts = append(opts, dialer.WithPreferIPv6())
+				} else if inIP.Is4() {
+					opts = append(opts, dialer.WithPreferIPv4())
+				}
+			}
+		}
+	}
 	opts = append(opts, dialer.WithResolver(resolver.DirectHostResolver))
 	c, err := dialer.DialContext(ctx, "tcp", metadata.RemoteAddress(), opts...)
 	if err != nil {
@@ -42,7 +61,27 @@ func (d *Direct) ListenPacketContext(ctx context.Context, metadata *C.Metadata) 
 	if err := d.ResolveUDP(ctx, metadata); err != nil {
 		return nil, err
 	}
-	pc, err := dialer.NewDialer(d.DialOptions()...).ListenPacket(ctx, "udp", "", metadata.AddrPort())
+	opts := d.DialOptions()
+	if d.prefer == C.DualStack {
+		srcIP := metadata.SrcIP.Unmap()
+		if srcIP.IsValid() && !srcIP.IsUnspecified() {
+			if srcIP.Is6() {
+				opts = append(opts, dialer.WithPreferIPv6())
+			} else if srcIP.Is4() {
+				opts = append(opts, dialer.WithPreferIPv4())
+			}
+		} else {
+			inIP := metadata.InIP.Unmap()
+			if inIP.IsValid() && !inIP.IsUnspecified() {
+				if inIP.Is6() {
+					opts = append(opts, dialer.WithPreferIPv6())
+				} else if inIP.Is4() {
+					opts = append(opts, dialer.WithPreferIPv4())
+				}
+			}
+		}
+	}
+	pc, err := dialer.NewDialer(opts...).ListenPacket(ctx, "udp", "", metadata.AddrPort())
 	if err != nil {
 		return nil, err
 	}
